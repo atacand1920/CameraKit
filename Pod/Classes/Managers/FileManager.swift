@@ -22,16 +22,18 @@ THE SOFTWARE.
 
 import Foundation
 
-@objc class FileManager: NSObject {
+@objc class FileManagerSaif: NSObject {
 
     class func getPath(name: String, ext: String) -> NSURL{
         
-        let urlPath  = NSURL(fileURLWithPath: NSTemporaryDirectory()).URLByAppendingPathComponent(name).URLByAppendingPathExtension(ext)
-        let tempPath = urlPath.absoluteString
+       
         
-        if NSFileManager.defaultManager().fileExistsAtPath(urlPath.path!) {
+        let urlPath  =  NSURL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(name + "." + ext)
+        let tempPath = urlPath!.absoluteString
+        
+        if FileManager.default.fileExists(atPath: (urlPath?.path)!) {
             do {
-                try NSFileManager.defaultManager().removeItemAtURL(urlPath)
+                try FileManager.default.removeItem(at: urlPath!)
             }
             catch let error as NSError {
                 
@@ -48,15 +50,15 @@ import Foundation
         
         // Now lets get the directory contents (including folders)
         do {
-            let directoryContents = try NSFileManager.defaultManager().contentsOfDirectoryAtURL(documentsUrl, includingPropertiesForKeys: nil, options: NSDirectoryEnumerationOptions())
+            let directoryContents = try FileManager.default.contentsOfDirectory(at: documentsUrl as URL, includingPropertiesForKeys: nil, options: FileManager.DirectoryEnumerationOptions())
             
-            for url: NSURL in directoryContents {
+            for url: URL in directoryContents {
                 
                 print(url.absoluteString)
                 
                 // Remove contents of directory (element by element)
                 do {
-                    try NSFileManager.defaultManager().removeItemAtURL(url)
+                    try FileManager.default.removeItem(at: url)
                     
                 }
                 catch let error as NSError {
@@ -75,12 +77,12 @@ import Foundation
         return NSURL(string: url)?.lastPathComponent ?? ""
     }
     
-    class func getVidePath(name: String, ext: String) -> NSURL {
+    class func getVidePath(name: String, ext: String) -> URL {
         
-        let fileManager     = NSFileManager.defaultManager()
-        let directoryURL    = fileManager.URLsForDirectory(.DocumentDirectory, inDomains: .UserDomainMask)[0]
-        let pathComponent   = getVideoName(name)
-        let fileURL         = directoryURL.URLByAppendingPathComponent(pathComponent).URLByAppendingPathExtension(ext)
+        let fileManager     = FileManager.default
+        let directoryURL    = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let pathComponent   = getVideoName(url: name)
+        let fileURL         = directoryURL.appendingPathComponent(pathComponent).appendingPathExtension(ext)
         
         return fileURL
     }

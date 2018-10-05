@@ -36,9 +36,9 @@ import AssetsLibrary
     
     // MARK: Init / Deinit
     
-    internal init(fileUrl:NSURL, height:Int, width:Int, channels:Int, samples:Float64) {
+    internal init(fileUrl:NSURL, height:Int, width:Int, channels:UInt32, samples:Float64) {
         
-        guard let writer = try? AVAssetWriter(URL: fileUrl, fileType: AVFileTypeQuickTimeMovie) else {
+        guard let writer = try? AVAssetWriter(outputURL: fileUrl as URL, fileType: AVFileTypeQuickTimeMovie) else {
             fatalError("AVAssetWriter error")
         }
         
@@ -46,20 +46,20 @@ import AssetsLibrary
         
         // Video
         let videoOutputSettings = [AVVideoCodecKey  : AVVideoCodecH264,
-                                   AVVideoWidthKey  : NSNumber(int: Int32(width)),
-                                   AVVideoHeightKey : NSNumber(int: Int32(height))]
+                                   AVVideoWidthKey  : NSNumber(value: Int32(width)),
+                                   AVVideoHeightKey : NSNumber(value: Int32(height))] as [String : Any]
         
-        guard writer.canApplyOutputSettings(videoOutputSettings, forMediaType: AVMediaTypeVideo) else {
+        guard writer.canApply(outputSettings: videoOutputSettings, forMediaType: AVMediaTypeVideo) else {
             fatalError("Can't apply the Output settings for video media.")
         }
         
         videoInput = AVAssetWriterInput(mediaType: AVMediaTypeVideo, outputSettings: videoOutputSettings)
         videoInput.expectsMediaDataInRealTime = true
         if width > height {
-            videoInput.transform = CGAffineTransformMakeRotation(CGFloat(M_PI_2))
+            videoInput.transform = CGAffineTransform(rotationAngle: CGFloat(Double.pi / 2))
         }
 
-        fileWriter.addInput(self.videoInput)
+        fileWriter.add(self.videoInput)
         
         // Audio
         let audioOutputSettings = [ AVFormatIDKey : Int(kAudioFormatMPEG4AAC),
@@ -68,18 +68,18 @@ import AssetsLibrary
                                     AVEncoderBitRateKey : Int(64000)
         ]
         
-        guard writer.canApplyOutputSettings(audioOutputSettings, forMediaType: AVMediaTypeAudio) else {
+        guard writer.canApply(outputSettings: audioOutputSettings, forMediaType: AVMediaTypeAudio) else {
             fatalError("Can't apply the Output settings for audio media.")
         }
         
         self.audioInput = AVAssetWriterInput(mediaType: AVMediaTypeAudio, outputSettings: audioOutputSettings)
         self.audioInput.expectsMediaDataInRealTime = true
-        self.fileWriter.addInput(self.audioInput)
+        self.fileWriter.add(self.audioInput)
     }
     
     internal init(fileUrl:NSURL, height:Int, width:Int) {
         
-        guard let writer = try? AVAssetWriter(URL: fileUrl, fileType: AVFileTypeQuickTimeMovie) else {
+        guard let writer = try? AVAssetWriter(outputURL: fileUrl as URL, fileType: AVFileTypeQuickTimeMovie) else {
             fatalError("AVAssetWriter error")
         }
         
@@ -87,21 +87,21 @@ import AssetsLibrary
         
         // Video
         let videoOutputSettings = [AVVideoCodecKey  : AVVideoCodecH264,
-            AVVideoWidthKey  : NSNumber(int: Int32(width)),
-            AVVideoHeightKey : NSNumber(int: Int32(height))]
+                                   AVVideoWidthKey  : NSNumber(value: Int32(width)),
+                                   AVVideoHeightKey : NSNumber(value: Int32(height))] as [String : Any]
         
-        guard writer.canApplyOutputSettings(videoOutputSettings, forMediaType: AVMediaTypeVideo) else {
+        guard writer.canApply(outputSettings: videoOutputSettings, forMediaType: AVMediaTypeVideo) else {
             fatalError("Can't apply the Output settings for video media.")
         }
         
         videoInput = AVAssetWriterInput(mediaType: AVMediaTypeVideo, outputSettings: videoOutputSettings)
         videoInput.expectsMediaDataInRealTime = true
         if width > height {
-            videoInput.transform = CGAffineTransformMakeRotation(CGFloat(M_PI_2))
+            videoInput.transform = CGAffineTransform(rotationAngle: CGFloat(Double.pi / 2))
         }
 
         
-        fileWriter.addInput(self.videoInput)
+        fileWriter.add(self.videoInput)
     }
     
     deinit {
@@ -114,20 +114,20 @@ import AssetsLibrary
     
     // MARK: Writter
     
-    internal func write(sample: CMSampleBufferRef, isVideo: Bool){
+    internal func write(sample: CMSampleBuffer, isVideo: Bool){
         
         if CMSampleBufferDataIsReady(sample) {
             
-            if self.fileWriter.status == .Unknown {
+            if self.fileWriter.status == .unknown {
                 
                 print("Start writing, isVideo = \(isVideo), status = \(self.fileWriter.status.rawValue)")
                 
                 let startTime = CMSampleBufferGetPresentationTimeStamp(sample)
                 self.fileWriter.startWriting()
-                self.fileWriter.startSessionAtSourceTime(startTime)
+                self.fileWriter.startSession(atSourceTime: startTime)
             }
             
-            if self.fileWriter.status == .Failed {
+            if self.fileWriter.status == .failed {
                 
                 print("Error occured, isVideo = \(isVideo), status = \(self.fileWriter.status.rawValue), \(self.fileWriter.error!.localizedDescription)")
                 return
@@ -135,20 +135,20 @@ import AssetsLibrary
             
             if isVideo {
                 
-                if self.videoInput.readyForMoreMediaData {
-                    self.videoInput.appendSampleBuffer(sample)
+                if self.videoInput.isReadyForMoreMediaData {
+                    self.videoInput.append(sample)
                 }
             }
             else {
                 
-                if self.audioInput.readyForMoreMediaData {
-                    self.audioInput.appendSampleBuffer(sample)
+                if self.audioInput.isReadyForMoreMediaData {
+                    self.audioInput.append(sample)
                 }
             }
         }
     }
     
-    internal func finish(callback: Void -> Void){
-        self.fileWriter.finishWritingWithCompletionHandler(callback)
+    internal func finish(callback:@escaping ()  -> Void){
+        self.fileWriter.finishWriting(completionHandler: callback)
     }
 }

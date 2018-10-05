@@ -28,8 +28,8 @@ extension NSError {
         
         let userInfo: [NSObject : AnyObject] =
         [
-            NSLocalizedDescriptionKey : localizedDescription ?? "",
-            NSLocalizedFailureReasonErrorKey : localizedFailureReason ?? ""
+            NSLocalizedDescriptionKey as NSObject : localizedDescription as AnyObject ,
+            NSLocalizedFailureReasonErrorKey as NSObject : localizedFailureReason as AnyObject
         ]
         
         self.init(domain: domain, code: -1, userInfo: userInfo)
@@ -39,8 +39,8 @@ extension NSError {
         
         let userInfo: [NSObject : AnyObject] =
         [
-            NSLocalizedDescriptionKey : localizedDescription ?? "",
-            NSLocalizedFailureReasonErrorKey : localizedFailureReason ?? ""
+            NSLocalizedDescriptionKey as NSObject : localizedDescription as AnyObject ,
+            NSLocalizedFailureReasonErrorKey as NSObject : localizedFailureReason as AnyObject
         ]
         
         self.init(domain: domain, code: code, userInfo: userInfo)

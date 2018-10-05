@@ -35,10 +35,10 @@ extension UIViewController {
         okAction: OkActionPerformed?,
         completion: AlertPerformed?) {
             
-            let alertController = UIAlertController(title: title, message: message, preferredStyle: .Alert)
+        let alertController = UIAlertController(title: title, message: message, preferredStyle: .alert)
             
             if cancelAction != nil {
-                let cancelAction = UIAlertAction(title: cancel, style: .Cancel) { (action) in
+                let cancelAction = UIAlertAction(title: cancel, style: .cancel) { (action) in
                     if let a = cancelAction {
                         a(action)
                     }
@@ -46,14 +46,14 @@ extension UIViewController {
                 alertController.addAction(cancelAction)
             }
             
-            let OKAction = UIAlertAction(title: ok, style: .Default) { (action) in
+        let OKAction = UIAlertAction(title: ok, style: .default) { (action) in
                 if let a = okAction {
                     a(action)
                 }
             }
             alertController.addAction(OKAction)
             
-            self.presentViewController(alertController, animated: true) {
+        self.present(alertController, animated: true) {
                 if let a = completion {
                     a()
                 }

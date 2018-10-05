@@ -31,10 +31,10 @@ import PGMTimer
 
 public typealias VideoCompletionType = (NSURL?, NSError?, LocalIdentifierType?) -> ()
 public typealias CompletionType      = () -> ()
-public typealias CompletionBoolType  = Bool -> ()
-public typealias CompletionErrorType = NSError? -> ()
-public typealias SizeCompletionType  = Int64? -> ()
-public typealias TimeCompletionType  = String? -> ()
+public typealias CompletionBoolType  = (Bool) -> ()
+public typealias CompletionErrorType = (NSError?) -> ()
+public typealias SizeCompletionType  = (Int64?) -> ()
+public typealias TimeCompletionType  = (String?) -> ()
 public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?) -> ()
 
 @objc public class PGMCameraKit: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
@@ -47,10 +47,10 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
     
     /// Bool property to determine if current device has front camera.
     public var hasFrontCamera: Bool = {
-        let devices = AVCaptureDevice.devicesWithMediaType(AVMediaTypeVideo)
-        for  device in devices  {
+        let devices = AVCaptureDevice.devices(withMediaType: AVMediaTypeVideo)
+        for  device in devices!  {
             let captureDevice = device as! AVCaptureDevice
-            if (captureDevice.position == .Front) {
+            if (captureDevice.position == .front) {
                 return true
             }
         }
@@ -59,10 +59,10 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
     
     /// Bool property to determine if current device has flash.
     public var hasFlash: Bool = {
-        let devices = AVCaptureDevice.devicesWithMediaType(AVMediaTypeVideo)
-        for  device in devices  {
+        let devices = AVCaptureDevice.devices(withMediaType: AVMediaTypeVideo)
+        for  device in devices!  {
             let captureDevice = device as! AVCaptureDevice
-            if (captureDevice.position == .Back) {
+            if (captureDevice.position == .back) {
                 return captureDevice.hasFlash
             }
         }
@@ -73,7 +73,7 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
     public var cameraDevice = CameraDevice.Front {
         didSet {
             if cameraDevice != oldValue {
-                updateCameraDevice(cameraDevice)
+                updateCameraDevice(deviceType: cameraDevice)
             }
         }
     }
@@ -82,7 +82,7 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
     public var flashMode = CameraFlashMode.Off {
         didSet {
             if flashMode != oldValue {
-                updateFlasMode(flashMode)
+                updateFlasMode(flashMode: flashMode)
             }
         }
     }
@@ -91,7 +91,7 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
     public var cameraOutputQuality = CameraOutputQuality.High {
         didSet {
             if cameraOutputQuality != oldValue {
-                updateCameraQualityMode(cameraOutputQuality)
+                updateCameraQualityMode(newCameraOutputQuality: cameraOutputQuality)
             }
         }
     }
@@ -100,13 +100,13 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
     public var cameraOutputMode = CameraOutputMode.VideoWithMic {
         didSet {
             if cameraOutputMode != oldValue {
-                setupOutputMode(cameraOutputMode, oldCameraOutputMode: oldValue)
+                setupOutputMode(newCameraOutputMode: cameraOutputMode, oldCameraOutputMode: oldValue)
             }
         }
     }
     
     /// This property specifies a hard limit on the duration of recorded files.
-    public var maxRecordedDuration:NSTimeInterval = 9.0
+    public var maxRecordedDuration:TimeInterval = 9.0
     
     /// Video preview layer
     public var previewLayer: AVCaptureVideoPreviewLayer?
@@ -134,22 +134,22 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
     
     private var videoCompletition: VideoCompletionType?
     
-    private let lockQueue       = dispatch_queue_create("com.aumentia.lockQueue", nil)
+    private let lockQueue       = DispatchQueue(label: "com.aumentia.lockQueue")
     
-    private let sessionQueue    = dispatch_queue_create("com.aumentia.recordingQueue", DISPATCH_QUEUE_SERIAL)
+    private let sessionQueue    = DispatchQueue(label:"com.aumentia.recordingQueue")
     
     private lazy var frontCameraDevice: AVCaptureDevice? = {
-        let devices = AVCaptureDevice.devicesWithMediaType(AVMediaTypeVideo) as! [AVCaptureDevice]
-        return devices.filter{$0.position == .Front}.first
+        let devices = AVCaptureDevice.devices(withMediaType: AVMediaTypeVideo) as! [AVCaptureDevice]
+        return devices.filter{$0.position == .front}.first
     }()
     
     private lazy var backCameraDevice: AVCaptureDevice? = {
-        let devices = AVCaptureDevice.devicesWithMediaType(AVMediaTypeVideo) as! [AVCaptureDevice]
-        return devices.filter{$0.position == .Back}.first
+        let devices = AVCaptureDevice.devices(withMediaType: AVMediaTypeVideo) as! [AVCaptureDevice]
+        return devices.filter{$0.position == .back}.first
     }()
     
     private lazy var mic: AVCaptureDevice? = {
-        return AVCaptureDevice.defaultDeviceWithMediaType(AVMediaTypeAudio)
+        return AVCaptureDevice.defaultDevice(withMediaType: AVMediaTypeAudio)
     }()
     
     private var library: PHPhotoLibrary?
@@ -186,7 +186,7 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
     */
     public func tempFilePath() -> NSURL {
         
-        return FileManager.getPath("tempMovie", ext: "mp4")
+        return FileManagerSaif.getPath(name: "tempMovie", ext: "mp4")
     }
     
     /**
@@ -198,7 +198,7 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
      */
     public func tempCompressFilePath(ext: String) -> NSURL {
         
-        return FileManager.getPath("tempCompressMovie", ext: ext)
+        return FileManagerSaif.getPath(name: "tempCompressMovie", ext: ext)
     }
     
     
@@ -209,7 +209,7 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
     
     - parameter cameraError: CompletionErrorType
     */
-    public func addCameraErrorListener(cameraError: CompletionErrorType) {
+    public func addCameraErrorListener(cameraError: @escaping CompletionErrorType) {
         self.cameraError = cameraError
     }
     
@@ -218,7 +218,7 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
      
      - parameter cameraTime: TimeCompletionType
      */
-    public func addCameraTimeListener(cameraTime: TimeCompletionType) {
+    public func addCameraTimeListener(cameraTime: @escaping TimeCompletionType) {
         self.cameraTime = cameraTime
     }
     
@@ -227,7 +227,7 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
      
      - parameter cameraMaxAllowedLength: VideoCompletionType
      */
-    public func addMaxAllowedLengthListener(cameraMaxAllowedLength: VideoCompletionType) {
+    public func addMaxAllowedLengthListener(cameraMaxAllowedLength: @escaping VideoCompletionType) {
         self.cameraMaxAllowedLength = cameraMaxAllowedLength
     }
     
@@ -257,12 +257,12 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
             
             if cameraIsSetup {
                 
-                addPreeviewLayerToView(view)
+                addPreeviewLayerToView(view: view)
                 cameraOutputMode = newCameraOutputMode
             }
             else {
-                setupCamera({ [weak self] () -> () in
-                    self?.addPreeviewLayerToView(view)
+                setupCamera(completition: { [weak self] () -> () in
+                    self?.addPreeviewLayerToView(view: view)
                     self?.cameraOutputMode = newCameraOutputMode
                     })
             }
@@ -278,24 +278,24 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
      
      - parameter completition: Completition block with the result of permission request
      */
-    public func askUserForCameraPermissions(completition: CompletionBoolType) {
+    public func askUserForCameraPermissions(completition: @escaping CompletionBoolType) {
         
-        AVCaptureDevice.requestAccessForMediaType(AVMediaTypeVideo, completionHandler: { [weak self] (alowedAccess) -> () in
+        AVCaptureDevice.requestAccess(forMediaType: AVMediaTypeVideo, completionHandler: { [weak self] (alowedAccess) -> () in
             
             if self?.cameraOutputMode == .VideoWithMic {
                 
-                AVCaptureDevice.requestAccessForMediaType(AVMediaTypeAudio, completionHandler: { (alowedAccess) -> () in
-                    
-                    dispatch_sync(dispatch_get_main_queue(), { () -> () in
-                        completition(alowedAccess)
+                AVCaptureDevice.requestAccess(forMediaType: AVMediaTypeAudio, completionHandler: { (alowedAccess) -> () in
+                    DispatchQueue.main.async(execute: {
+                          completition(alowedAccess)
                     })
+                   
                 })
             }
             else {
-                
-                dispatch_sync(dispatch_get_main_queue(), { () -> () in
-                    completition(alowedAccess)
-                })
+                 DispatchQueue.main.async(execute: {
+                     completition(alowedAccess)
+                 })
+              
             }
             })
     }
@@ -315,7 +315,7 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
         
         if let validCaptureSession = captureSession {
             
-            if !validCaptureSession.running && cameraIsSetup {
+            if !validCaptureSession.isRunning && cameraIsSetup {
                 
                 validCaptureSession.startRunning()
                 startFollowingDeviceOrientation()
@@ -328,11 +328,11 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
                 if cameraIsSetup {
                     stopAndRemoveCaptureSession()
                 }
-                setupCamera({ [weak self] () -> () in
+                setupCamera(completition: { [weak self] () -> () in
                     
                     if let validEmbedingView = self?.embedingView {
                         
-                        self?.addPreeviewLayerToView(validEmbedingView)
+                        self?.addPreeviewLayerToView(view: validEmbedingView)
                     }
                     self?.startFollowingDeviceOrientation()
                     })
@@ -350,8 +350,8 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
         var shouldReinitializeMovieOutput = movieOutput == nil
         
         if !shouldReinitializeMovieOutput {
-            if let connection = movieOutput!.connectionWithMediaType(AVMediaTypeVideo) {
-                shouldReinitializeMovieOutput = shouldReinitializeMovieOutput || !connection.active
+            if let connection = movieOutput!.connection(withMediaType: AVMediaTypeVideo) {
+                shouldReinitializeMovieOutput = shouldReinitializeMovieOutput || !connection.isActive
             }
         }
         
@@ -371,15 +371,15 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
     
     - parameter imageCompletition: imageCompletition Completition block containing the captured UIImage
     */
-    public func capturePictureWithCompletition(imageCompletition: ImageCompletionType, name: String) {
+    public func capturePictureWithCompletition(imageCompletition: @escaping ImageCompletionType, name: String) {
         
         if cameraIsSetup {
             
             if cameraOutputMode == .StillImage {
                 
-                dispatch_async(sessionQueue, {
+                sessionQueue.async {
                     
-                    self.getStillImageOutput().captureStillImageAsynchronouslyFromConnection(self.getStillImageOutput().connectionWithMediaType(AVMediaTypeVideo), completionHandler: { (sample: CMSampleBuffer!, error: NSError!) -> () in
+                    self.getStillImageOutput().captureStillImageAsynchronously(from: self.getStillImageOutput().connection(withMediaType: AVMediaTypeVideo), completionHandler: ({ (sample: CMSampleBuffer!, error: NSError!) -> () in
                         
                         if (error != nil) {
                             imageCompletition(nil, error, "")
@@ -391,19 +391,19 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
                             let helper = PGMCameraKitHelper()
                             
                             // Save the image to library
-                            if let imageToSave = UIImage(data: imageData) {
+                            if let imageToSave = UIImage(data: imageData!) {
                                 
-                                helper.saveImageAsAsset(imageToSave, completion: { (localIdentifier, error) -> () in
+                                helper.saveImageAsAsset(image: imageToSave, completion: { (localIdentifier, error) -> () in
                                     
                                     imageCompletition(imageToSave, error, localIdentifier)
                                 })
                             }
                             else {
-                                imageCompletition(UIImage(data: imageData), nil, "")
+                                imageCompletition(UIImage(data: imageData!), nil, "")
                             }
                         }
-                    })
-                })
+                        } as! (CMSampleBuffer?, Error?) -> Void))
+                }
             }
             else {
                 
@@ -426,11 +426,11 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
     
     - parameter completion: CompletionErrorType
     */
-    public func startRecordingVideo(completion: CompletionErrorType) {
+    public func startRecordingVideo(completion: @escaping CompletionErrorType) {
         
         if cameraOutputMode != .StillImage {
             
-            dispatch_sync(self.lockQueue) {
+          lockQueue.sync  {
                 
                 if !self.isCapturing{
                     
@@ -459,18 +459,18 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
                             
                         }, timerDidStop: { [weak self] in
                             
-                            self?.stopProcess(false)
+                            self?.stopProcess(reachedMaxAllowedLenght: false)
                             
                         }, timerDidEnd: { [weak self] time in
                             
-                            self?.stopProcess(true)
+                            self?.stopProcess(reachedMaxAllowedLenght: true)
                         })
                     
                     self.timer?.start()
                     
                     self.captureSession?.beginConfiguration()
                     if self.flashMode != .Off {
-                        self.updateTorch(self.flashMode)
+                        self.updateTorch(flashMode: self.flashMode)
                     }
                     self.captureSession?.commitConfiguration()
                     
@@ -489,11 +489,11 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
      
      - parameter completition: VideoCompletionType
      */
-    public func stopRecordingVideo(completition:VideoCompletionType) {
+    public func stopRecordingVideo(completition:@escaping VideoCompletionType) {
         
         if let _ = movieOutput {
             
-            dispatch_sync(self.lockQueue) {
+            lockQueue.sync  {
                 
                 guard (self.timer?.state == .TimerStateRunning) else {
                     
@@ -522,7 +522,7 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
      */
     public func pauseRecordingVideo() {
         
-        dispatch_sync(self.lockQueue) {
+        self.lockQueue.sync {
             
             if self.isCapturing {
                 
@@ -544,7 +544,7 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
      */
     public func resumeRecordingVideo() {
         
-        dispatch_sync(self.lockQueue) {
+        self.lockQueue.sync {
             
             if self.isCapturing{
                 
@@ -595,9 +595,9 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
     
     // MARK: AVCaptureDataVideoDelegate
     
-    public func captureOutput(captureOutput: AVCaptureOutput!, didOutputSampleBuffer sampleBuffer: CMSampleBuffer!, fromConnection connection: AVCaptureConnection!) {
+    public func captureOutput(_ captureOutput: AVCaptureOutput!, didOutputSampleBuffer sampleBuffer: CMSampleBuffer!, from connection: AVCaptureConnection!) {
         
-        dispatch_sync(self.lockQueue) {
+        self.lockQueue.sync {
             
             if !self.isCapturing || self.isPaused {
                 return
@@ -609,11 +609,11 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
                 
                 if self.videoWriter == nil && !isVideo {
                     
-                    let fileManager = NSFileManager()
+                    let fileManager = FileManager()
                     
-                    if fileManager.fileExistsAtPath(self.filePath()) {
+                    if fileManager.fileExists(atPath: self.filePath()) {
                         do {
-                            try fileManager.removeItemAtPath(self.filePath())
+                            try fileManager.removeItem(atPath: self.filePath())
                         }
                         catch let outError as NSError {
                             
@@ -637,7 +637,7 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
                         
                         self.isInitialSetup = false
                         
-                        if AVCaptureVideoOrientation(ui:UIDevice.currentDevice().orientation) == .Portrait {
+                        if AVCaptureVideoOrientation(ui:UIDevice.current.orientation) == .portrait {
                             w = self.height
                             h = self.width
                         }
@@ -655,19 +655,19 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
                         fileUrl: self.filePathUrl(),
                         height: h,
                         width: w,
-                        channels: Int(asbd.memory.mChannelsPerFrame),
-                        samples: asbd.memory.mSampleRate
+                        channels: (asbd?.pointee.mChannelsPerFrame)!,
+                        samples: (asbd?.pointee.mSampleRate)!
                     )
                 }
             }
             else {
                 if self.videoWriter == nil && isVideo {
                     
-                    let fileManager = NSFileManager()
+                    let fileManager = FileManager()
                     
-                    if fileManager.fileExistsAtPath(self.filePath()) {
+                    if fileManager.fileExists(atPath: self.filePath()) {
                         do {
-                            try fileManager.removeItemAtPath(self.filePath())
+                            try fileManager.removeItem(atPath: self.filePath())
                         }
                         catch let outError as NSError {
                             
@@ -697,13 +697,13 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
                 
                 var pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
                 
-                let isAudioPtsValid = self.lastAudioPts!.flags.intersect(CMTimeFlags.Valid)
+                let isAudioPtsValid = self.lastAudioPts!.flags.intersection(CMTimeFlags.valid)
                 
                 if isAudioPtsValid.rawValue != 0 {
                     
                     print("isAudioPtsValid is valid")
                     
-                    let isTimeOffsetPtsValid = self.timeOffset.flags.intersect(CMTimeFlags.Valid)
+                    let isTimeOffsetPtsValid = self.timeOffset.flags.intersection(CMTimeFlags.valid)
                     
                     if isTimeOffsetPtsValid.rawValue != 0 {
                         print("isTimeOffsetPtsValid is valid")
@@ -728,12 +728,12 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
             
             var buffer = sampleBuffer
             if self.timeOffset.value > 0 {
-                buffer = self.ajustTimeStamp(sampleBuffer, offset: self.timeOffset)
+                buffer = self.ajustTimeStamp(sample: sampleBuffer, offset: self.timeOffset)
             }
             
             if !isVideo {
-                var pts = CMSampleBufferGetPresentationTimeStamp(buffer)
-                let dur = CMSampleBufferGetDuration(buffer)
+                var pts = CMSampleBufferGetPresentationTimeStamp(buffer!)
+                let dur = CMSampleBufferGetDuration(buffer!)
                 if (dur.value > 0)
                 {
                     pts = CMTimeAdd(pts, dur)
@@ -741,7 +741,7 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
                 self.lastAudioPts = pts
             }
             
-            self.videoWriter?.write(buffer, isVideo: isVideo)
+            self.videoWriter?.write(sample: buffer!, isVideo: isVideo)
         }
     }
     
@@ -750,11 +750,11 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
     
     // MARK: Setups
     
-    private func ajustTimeStamp(sample: CMSampleBufferRef, offset: CMTime) -> CMSampleBufferRef {
+    private func ajustTimeStamp(sample: CMSampleBuffer, offset: CMTime) -> CMSampleBuffer {
         
         var count: CMItemCount = 0
         CMSampleBufferGetSampleTimingInfoArray(sample, 0, nil, &count);
-        var info = [CMSampleTimingInfo](count: count, repeatedValue: CMSampleTimingInfo(duration: CMTimeMake(0, 0), presentationTimeStamp: CMTimeMake(0, 0), decodeTimeStamp: CMTimeMake(0, 0)))
+        var info = [CMSampleTimingInfo](repeating: CMSampleTimingInfo(duration: CMTimeMake(0, 0), presentationTimeStamp: CMTimeMake(0, 0), decodeTimeStamp: CMTimeMake(0, 0)), count: count)
         CMSampleBufferGetSampleTimingInfoArray(sample, count, &info, &count);
         
         for i in 0..<count {
@@ -780,13 +780,13 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
         
         captureSession?.beginConfiguration()
         
-        let devices = AVCaptureDevice.devicesWithMediaType(AVMediaTypeVideo)
+        let devices = AVCaptureDevice.devices(withMediaType: AVMediaTypeVideo)
         
-        for  device in devices  {
+        for  device in devices!  {
             
             let captureDevice = device as! AVCaptureDevice
             
-            if (captureDevice.position == AVCaptureDevicePosition.Back) {
+            if (captureDevice.position == AVCaptureDevicePosition.back) {
                 
                 let avTorchMode = AVCaptureTorchMode(rawValue: flashMode.rawValue)
                 
@@ -815,7 +815,7 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
             videoDataOutput.setSampleBufferDelegate(self, queue: sessionQueue)
             videoDataOutput.alwaysDiscardsLateVideoFrames = true
             let setcapSettings: [NSObject : AnyObject] = [
-                kCVPixelBufferPixelFormatTypeKey : Int(kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
+                kCVPixelBufferPixelFormatTypeKey : Int(kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange) as AnyObject
             ]
             videoDataOutput.videoSettings = setcapSettings
             
@@ -842,8 +842,8 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
         
         if !shouldReinitializeStillImageOutput {
             
-            if let connection = stillImageOutput!.connectionWithMediaType(AVMediaTypeVideo) {
-                shouldReinitializeStillImageOutput = shouldReinitializeStillImageOutput || !connection.active
+            if let connection = stillImageOutput!.connection(withMediaType: AVMediaTypeVideo) {
+                shouldReinitializeStillImageOutput = shouldReinitializeStillImageOutput || !connection.isActive
             }
         }
         
@@ -859,20 +859,20 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
         return stillImageOutput!
     }
     
-    private func setupCamera(completition: CompletionType) {
+    private func setupCamera(completition: @escaping CompletionType) {
         captureSession = AVCaptureSession()
-
-        dispatch_async(sessionQueue, {
+       
+        sessionQueue.async  {
             if let validCaptureSession = self.captureSession {
                 validCaptureSession.beginConfiguration()
                 validCaptureSession.sessionPreset = AVCaptureSessionPresetHigh
-                self.updateCameraDevice(self.cameraDevice)
+                self.updateCameraDevice(deviceType: self.cameraDevice)
                 self.setupOutputs()
-                self.setupOutputMode(self.cameraOutputMode, oldCameraOutputMode: nil)
+                self.setupOutputMode(newCameraOutputMode: self.cameraOutputMode, oldCameraOutputMode: nil)
                 self.setupPreviewLayer()
                 validCaptureSession.commitConfiguration()
-                self.updateFlasMode(self.flashMode)
-                self.updateCameraQualityMode(self.cameraOutputQuality)
+                self.updateFlasMode(flashMode: self.flashMode)
+                self.updateCameraQualityMode(newCameraOutputQuality: self.cameraOutputQuality)
                 validCaptureSession.startRunning()
                 self.startFollowingDeviceOrientation()
                 self.cameraIsSetup = true
@@ -881,7 +881,7 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
                 
                 completition()
             }
-        })
+        }
     }
     
     private func setupOutputMode(newCameraOutputMode: CameraOutputMode, oldCameraOutputMode: CameraOutputMode?) {
@@ -924,18 +924,18 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
         case .VideoOnly, .VideoWithMic:
             let videoDataOutput = getMovieOutput()
             captureSession?.addOutput(videoDataOutput)
-            height = videoDataOutput.videoSettings["Height"] as! Int!
-            width = videoDataOutput.videoSettings["Width"] as! Int!
+            height = videoDataOutput.videoSettings["Height"] as? Int
+            width = videoDataOutput.videoSettings["Width"] as? Int
             
             if newCameraOutputMode == .VideoWithMic {
-                if let validMic = deviceInputFromDevice(mic) {
+                if let validMic = deviceInputFromDevice(device: mic) {
                     captureSession?.addInput(validMic)
                     captureSession?.addOutput(setupAudioOutput())
                 }
             }
         }
         captureSession?.commitConfiguration()
-        updateCameraQualityMode(cameraOutputQuality)
+        updateCameraQualityMode(newCameraOutputQuality: cameraOutputQuality)
         orientationChanged()
     }
     
@@ -951,7 +951,7 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
             audioOutput = setupAudioOutput()
         }
         if library == nil {
-            library = PHPhotoLibrary?()
+            library = PHPhotoLibrary.shared()
         }
     }
     
@@ -987,7 +987,7 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
                 
                 if hasFrontCamera {
                     
-                    if let validFrontDevice = deviceInputFromDevice(frontCameraDevice) {
+                    if let validFrontDevice = deviceInputFromDevice(device: frontCameraDevice) {
                         
                         frontCameraDevice!.activeVideoMinFrameDuration = CMTimeMake(1, 30)
                         
@@ -998,7 +998,7 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
                 }
             case .Back:
                 
-                if let validBackDevice = deviceInputFromDevice(backCameraDevice) {
+                if let validBackDevice = deviceInputFromDevice(device: backCameraDevice) {
                     
                     backCameraDevice!.activeVideoMinFrameDuration = CMTimeMake(1, 30)
                     
@@ -1018,13 +1018,13 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
         
         captureSession?.beginConfiguration()
         
-        let devices = AVCaptureDevice.devicesWithMediaType(AVMediaTypeVideo)
+        let devices = AVCaptureDevice.devices(withMediaType: AVMediaTypeVideo)
         
-        for  device in devices  {
+        for  device in devices!  {
             
             let captureDevice = device as! AVCaptureDevice
             
-            if (captureDevice.position == AVCaptureDevicePosition.Back) {
+            if (captureDevice.position == AVCaptureDevicePosition.back) {
                 
                 let avFlashMode = AVCaptureFlashMode(rawValue: flashMode.rawValue)
                 
@@ -1099,27 +1099,27 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
         
         self.isCapturing = false
         
-        dispatch_async(self.sessionQueue, {() -> Void in
+        self.sessionQueue.async{
             
-            self.videoWriter!.finish({() -> Void in
+            self.videoWriter!.finish(callback: {() -> Void in
                 
                 self.isCapturing = false
                 self.videoWriter = nil
                 self.timer       = nil
                 
-                self.updateTorch(.Off)
+                self.updateTorch(flashMode: .Off)
                 
                 // Get a reference to our helper
                 let helper = PGMCameraKitHelper()
                 
                 // Save the image to library
-                helper.saveVideoAsAsset(url, completion: { (localIdentifier, error) -> () in
+                helper.saveVideoAsAsset(videoURL: url!, completion: { (localIdentifier, error) -> () in
                     
                     print("save completed")
                     
                     if reachedMaxAllowedLenght == false {
                         // Manual stop
-                        self.executeVideoCompletitionWithURL(url, error: error, localIdentifier: localIdentifier)
+                        self.executeVideoCompletitionWithURL(url: url, error: error, localIdentifier: localIdentifier)
                     }
                     else {
                         // Automatic stop: remove manually the link
@@ -1128,19 +1128,21 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
                     
                 })
             })
-        })
+        }
     }
     
     private func addPreeviewLayerToView(view: UIView) {
         embedingView = view
-        dispatch_async(dispatch_get_main_queue(), { () -> () in
+        DispatchQueue.main.async {
+            
+        
             guard let _ = self.previewLayer else {
                 return
             }
             self.previewLayer!.frame = view.layer.bounds
             view.clipsToBounds = true
             view.layer.addSublayer(self.previewLayer!)
-        })
+        }
     }
     
     // MARK: Completion callbaks
@@ -1195,7 +1197,7 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
     // MARK: Helper Functions
     
     private func filePath() -> String {
-        let paths = NSSearchPathForDirectoriesInDomains(.DocumentDirectory, .UserDomainMask, true)
+        let paths = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)
         let documentsDirectory = paths[0] as String
         let filePath : String = "\(documentsDirectory)/video\(self.fileIndex).mp4"
         let _ = NSURL(fileURLWithPath: filePath)
@@ -1238,18 +1240,18 @@ public typealias ImageCompletionType = (UIImage?, NSError?, LocalIdentifierType?
     
     private func checkIfCameraIsAvailable() -> CameraState {
         
-        let deviceHasCamera = UIImagePickerController.isCameraDeviceAvailable(UIImagePickerControllerCameraDevice.Rear) || UIImagePickerController.isCameraDeviceAvailable(UIImagePickerControllerCameraDevice.Front)
+        let deviceHasCamera = UIImagePickerController.isCameraDeviceAvailable(UIImagePickerControllerCameraDevice.rear) || UIImagePickerController.isCameraDeviceAvailable(UIImagePickerControllerCameraDevice.front)
         
         if deviceHasCamera {
             
-            let authorizationStatus = AVCaptureDevice.authorizationStatusForMediaType(AVMediaTypeVideo)
+            let authorizationStatus = AVCaptureDevice.authorizationStatus(forMediaType: AVMediaTypeVideo)
             
-            let userAgreedToUseIt = authorizationStatus == .Authorized
+            let userAgreedToUseIt = authorizationStatus == .authorized
             
             if userAgreedToUseIt {
                 return .Ready
             }
-            else if authorizationStatus == AVAuthorizationStatus.NotDetermined {
+            else if authorizationStatus == AVAuthorizationStatus.notDetermined {
                 return .NotDetermined
             }
             else {

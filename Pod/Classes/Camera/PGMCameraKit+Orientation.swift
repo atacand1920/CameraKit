@@ -52,7 +52,7 @@ extension PGMCameraKit {
         
         if cameraIsObservingDeviceOrientation == nil ||  cameraIsObservingDeviceOrientation == false {
             
-            NSNotificationCenter.defaultCenter().addObserver(self, selector: #selector(PGMCameraKit.orientationChanged), name: UIDeviceOrientationDidChangeNotification, object: nil)
+            NotificationCenter.default.addObserver(self, selector: #selector(PGMCameraKit.orientationChanged), name: NSNotification.Name.UIDeviceOrientationDidChange, object: nil)
             cameraIsObservingDeviceOrientation = true
         }
     }
@@ -61,40 +61,41 @@ extension PGMCameraKit {
         
         if cameraIsObservingDeviceOrientation == true {
             
-            NSNotificationCenter.defaultCenter().removeObserver(self, name: UIDeviceOrientationDidChangeNotification, object: nil)
+            NotificationCenter.default.removeObserver(self, name: NSNotification.Name.UIDeviceOrientationDidChange, object: nil)
             cameraIsObservingDeviceOrientation = false
         }
     }
     
     @objc internal func orientationChanged() {
         
-        guard (UIDevice.currentDevice().orientation != .FaceDown && UIDevice.currentDevice().orientation != .FaceUp ) else {
+        guard (UIDevice.current.orientation != .faceDown && UIDevice.current.orientation != .faceUp ) else {
             return
         }
         
         var currentConnection: AVCaptureConnection?;
         switch cameraOutputMode {
         case .StillImage:
-            currentConnection = stillImageOutput?.connectionWithMediaType(AVMediaTypeVideo)
+            currentConnection = stillImageOutput?.connection(withMediaType: AVMediaTypeVideo)
         case .VideoOnly, .VideoWithMic:
-            currentConnection = getMovieOutput().connectionWithMediaType(AVMediaTypeVideo)
+            currentConnection = getMovieOutput().connection(withMediaType: AVMediaTypeVideo)
         }
         if let validPreviewLayer = previewLayer {
             if let validPreviewLayerConnection = validPreviewLayer.connection {
-                if validPreviewLayerConnection.supportsVideoOrientation {
+                if validPreviewLayerConnection.isVideoOrientationSupported {
                     validPreviewLayerConnection.videoOrientation = currentVideoOrientation()
                 }
             }
             if let validOutputLayerConnection = currentConnection {
-                if validOutputLayerConnection.supportsVideoOrientation {
+                if validOutputLayerConnection.isVideoOrientationSupported {
                     validOutputLayerConnection.videoOrientation = currentVideoOrientation()
                 }
             }
-            dispatch_async(dispatch_get_main_queue(), { () -> Void in
+            DispatchQueue.main.async {
                 if let validEmbedingView = self.embedingView {
                     validPreviewLayer.frame = validEmbedingView.bounds
                 }
-            })
+            }
+           
         }
     }
     
@@ -103,19 +104,19 @@ extension PGMCameraKit {
     
     private func currentVideoOrientation() -> AVCaptureVideoOrientation {
         
-        switch UIDevice.currentDevice().orientation {
+        switch UIDevice.current.orientation {
             
-        case .LandscapeLeft:
-            return .LandscapeRight
+        case .landscapeLeft:
+            return .landscapeRight
             
-        case .LandscapeRight:
-            return .LandscapeLeft
+        case .landscapeRight:
+            return .landscapeLeft
             
-        case .PortraitUpsideDown:
-            return .PortraitUpsideDown
+        case .portraitUpsideDown:
+            return .portraitUpsideDown
             
         default:
-            return .Portrait
+            return .portrait
         }
     }
 }
@@ -125,30 +126,30 @@ extension AVCaptureVideoOrientation {
     var uiDeviceOrientation: UIDeviceOrientation {
         get {
             switch self {
-            case .LandscapeLeft:        return .LandscapeLeft
-            case .LandscapeRight:       return .LandscapeRight
-            case .Portrait:             return .Portrait
-            case .PortraitUpsideDown:   return .PortraitUpsideDown
+            case .landscapeLeft:        return .landscapeLeft
+            case .landscapeRight:       return .landscapeRight
+            case .portrait:             return .portrait
+            case .portraitUpsideDown:   return .portraitUpsideDown
             }
         }
     }
     
     init(ui:UIDeviceOrientation) {
         switch ui {
-            case .LandscapeRight:
-                self = .LandscapeLeft
+            case .landscapeRight:
+                self = .landscapeLeft
                 //print("LandscapeRight")
-            case .LandscapeLeft:
-                self = .LandscapeRight
+            case .landscapeLeft:
+                self = .landscapeRight
                 //print("LandscapeLeft")
-            case .Portrait:
-                self = .Portrait
+            case .portrait:
+                self = .portrait
                 //print("Portrait")
-            case .PortraitUpsideDown:
-                self = .PortraitUpsideDown
+            case .portraitUpsideDown:
+                self = .portraitUpsideDown
                 //print("PortraitUpsideDown")
             default:
-                self = .Portrait
+                self = .portrait
                 //print("Portrait")
         }
     }

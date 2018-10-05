@@ -55,13 +55,13 @@ class ViewController: UIViewController {
             
             print("We don't have permission to use the camera.")
             
-            cameraManager.askUserForCameraPermissions({ [unowned self] permissionGranted in
+            cameraManager.askUserForCameraPermissions(completition: { [unowned self] permissionGranted in
                 
                 if permissionGranted {
                     self.addCameraToView()
                 }
                 else {
-                    self.addCameraAccessDeniedPopup("Go to settings and grant acces to the camera device to use it.")
+                    self.addCameraAccessDeniedPopup(message: "Go to settings and grant access to the camera device to use it.")
                 }
             })
         }
@@ -72,8 +72,8 @@ class ViewController: UIViewController {
         
         if !cameraManager.hasFlash {
             
-            flashModeButton.enabled = false
-            flashModeButton.setTitle("No flash", forState: UIControlState.Normal)
+            flashModeButton.isEnabled = false
+            flashModeButton.setTitle("No flash", for: UIControlState.normal)
         }
         
         
@@ -84,23 +84,23 @@ class ViewController: UIViewController {
         
         // Listeners
         
-        cameraManager.addCameraErrorListener( { [unowned self] error in
+        cameraManager.addCameraErrorListener( cameraError: { [unowned self] error in
             
             if let err = error {
                 
                 if err.code == CameraError.CameraAccessDeniend.rawValue {
                     
-                    self.addCameraAccessDeniedPopup(err.localizedFailureReason!)
+                    self.addCameraAccessDeniedPopup(message: err.localizedFailureReason!)
                 }
             }
         })
         
-        cameraManager.addCameraTimeListener( { time in
+        cameraManager.addCameraTimeListener( cameraTime: { time in
             
-            print("Time elapsed: \(time) seg")
+            print("Time elapsed: \(String(describing: time)) sec")
         })
         
-        cameraManager.addMaxAllowedLengthListener({ [unowned self] (videoURL, error, localIdentifier) -> () in
+        cameraManager.addMaxAllowedLengthListener(cameraMaxAllowedLength: { [unowned self] (videoURL, error, localIdentifier) -> () in
             
             if let err = error {
                 print("Error \(err)")
@@ -109,31 +109,31 @@ class ViewController: UIViewController {
                 
                 if let url = videoURL {
                     
-                    print("Saved video from local url \(url) with uuid \(localIdentifier)")
+                    print("Saved video from local url \(url) with uuid \(String(describing: localIdentifier))")
                     
-                    let data = NSData(contentsOfURL: url)!
+                    let data = NSData(contentsOf: url as URL)!
                     
                     print("Byte Size Before Compression: \(data.length / 1024) KB")
                     
                     // The compress file extension will depend on the output file type
-                    self.helper.compressVideo(url, outputURL: self.cameraManager.tempCompressFilePath("mp4"), outputFileType: AVFileTypeMPEG4, handler: { session in
+                    self.helper.compressVideo(inputURL: url, outputURL: self.cameraManager.tempCompressFilePath(ext: "mp4"), outputFileType: AVFileTypeMPEG4, handler: { session in
                         
                         if let currSession = session {
                             
                             print("Progress: \(currSession.progress)")
                             
-                            print("Save to \(currSession.outputURL)")
+                            print("Save to \(String(describing: currSession.outputURL))")
                             
-                            if currSession.status == .Completed {
+                            if currSession.status == .completed {
                                 
-                                if let data = NSData(contentsOfURL: currSession.outputURL!) {
+                                if let data = NSData(contentsOf: currSession.outputURL!) {
                                     
                                     print("File size after compression: \(data.length / 1024) KB")
                                     
                                     // Play compressed video
-                                    dispatch_async(dispatch_get_main_queue(), {
+                                    DispatchQueue.main.async(execute: {
                                         
-                                        let player  = AVPlayer(URL: currSession.outputURL!)
+                                        let player  = AVPlayer(url: currSession.outputURL!)
                                         let layer   = AVPlayerLayer(player: player)
                                         layer.frame = self.view.bounds
                                         self.view.layer.addSublayer(layer)
@@ -141,9 +141,10 @@ class ViewController: UIViewController {
                                         
                                         print("Playing video...")
                                     })
+                                   
                                 }
                             }
-                            else if currSession.status == .Failed
+                            else if currSession.status == .failed
                             {
                                 print(" There was a problem compressing the video maybe you can try again later. Error: \(currSession.error!.localizedDescription)")
                             }
@@ -153,27 +154,27 @@ class ViewController: UIViewController {
             }
             
             // Recording stopped automatically after reached max allowed duration
-            self.cameraButton.selected = !(self.cameraButton.selected)
-            self.cameraButton.setTitle(" ", forState: UIControlState.Selected)
-            self.cameraButton.backgroundColor = self.cameraButton.selected ? UIColor.redColor() : UIColor.greenColor()
+            self.cameraButton.isSelected = !(self.cameraButton.isSelected)
+            self.cameraButton.setTitle(" ", for: UIControlState.selected)
+            self.cameraButton.backgroundColor = self.cameraButton.isSelected ? UIColor.red   : UIColor.green
         })
         
     }
     
-    override func viewWillAppear(animated: Bool) {
+    override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         
-        navigationController?.navigationBar.hidden = true
+        navigationController?.navigationBar.isHidden = true
         cameraManager.resumeCaptureSession()
     }
     
-    override func viewWillDisappear(animated: Bool) {
+    override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         
         cameraManager.stopCaptureSession()
     }
     
-    override func viewDidAppear(animated: Bool) {
+    override func viewDidAppear(_ animated: Bool) {
         
     }
     
@@ -182,64 +183,61 @@ class ViewController: UIViewController {
     
     private func addCameraAccessDeniedPopup(message: String) {
         
-        dispatch_async(dispatch_get_main_queue(), {
-            self.showAlert("TubeAlert", message: message, ok: "Ok", cancel: "", cancelAction: nil, okAction: { alert in
+        DispatchQueue.main.async {
+            
+        
+            self.showAlert(title: "TubeAlert", message: message, ok: "Ok", cancel: "", cancelAction: nil, okAction: { alert in
                 
-                switch UIDevice.currentDevice().systemVersion.compare("8.0.0", options: NSStringCompareOptions.NumericSearch) {
-                case .OrderedSame, .OrderedDescending:
-                    UIApplication.sharedApplication().openURL(NSURL(string: UIApplicationOpenSettingsURLString)!)
-                case .OrderedAscending:
+                switch UIDevice.current.systemVersion.compare("8.0.0", options: NSString.CompareOptions.numeric) {
+                case .orderedSame, .orderedDescending:
+                    UIApplication.shared.openURL(NSURL(string: UIApplicationOpenSettingsURLString)! as URL)
+                case .orderedAscending:
                     print("Not supported")
                     break
                 }
                 }, completion: nil)
-        })
+        }
     }
     
     
     // MARK: Orientation
     
-    override func shouldAutorotate() -> Bool {
+   
+    override var shouldAutorotate: Bool {
         return true
     }
     
-    override func supportedInterfaceOrientations() -> UIInterfaceOrientationMask {
-        return [UIInterfaceOrientationMask.Portrait, UIInterfaceOrientationMask.LandscapeLeft, UIInterfaceOrientationMask.LandscapeRight, UIInterfaceOrientationMask.PortraitUpsideDown]
-    }
     
-    override func preferredInterfaceOrientationForPresentation() -> UIInterfaceOrientation {
-        return .Portrait
-    }
     
     
     // MARK: Add / Revemo camera
     
     private func addCameraToView()
     {
-        cameraManager.addPreviewLayerToView(cameraView, newCameraOutputMode: CameraOutputMode.VideoWithMic)
+        _ = cameraManager.addPreviewLayerToView(view: cameraView, newCameraOutputMode: CameraOutputMode.VideoWithMic)
     }
     
     
     // MARK: @IBActions
     
-    @IBAction func changeFlashMode(sender: UIButton)
+    @IBAction func changeFlashMode(_ sender: UIButton)
     {
         switch (cameraManager.changeFlashMode()) {
         case .Off:
-            sender.setTitle("Flash Off", forState: UIControlState.Normal)
+            sender.setTitle("Flash Off", for: UIControlState.normal)
         case .On:
-            sender.setTitle("Flash On", forState: UIControlState.Normal)
+            sender.setTitle("Flash On", for: UIControlState.normal)
         case .Auto:
-            sender.setTitle("Flash Auto", forState: UIControlState.Normal)
+            sender.setTitle("Flash Auto", for: UIControlState.normal)
         }
     }
     
-    @IBAction func recordButtonTapped(sender: UIButton) {
+    @IBAction func recordButtonTapped(_ sender: UIButton) {
         
         switch (cameraManager.cameraOutputMode) {
             
         case .StillImage:
-            cameraManager.capturePictureWithCompletition( { (image, error, localIdentifier) -> () in
+            cameraManager.capturePictureWithCompletition( imageCompletition: { (image, error, localIdentifier) -> () in
                 
                 if let err = error {
                     print("Error ocurred: \(err)")
@@ -252,11 +250,11 @@ class ViewController: UIViewController {
             
         case .VideoWithMic, .VideoOnly:
             
-            sender.selected = !sender.selected
-            sender.setTitle(" ", forState: UIControlState.Selected)
-            sender.backgroundColor = sender.selected ? UIColor.redColor() : UIColor.greenColor()
+            sender.isSelected = !sender.isSelected
+            sender.setTitle(" ", for: UIControlState.selected)
+            sender.backgroundColor = sender.isSelected ? UIColor.red : UIColor.green
             
-            if sender.selected {
+            if sender.isSelected {
                 
                 if cameraManager.timer?.state == .TimerStatePaused {
                     
@@ -264,7 +262,7 @@ class ViewController: UIViewController {
                 }
                 else {
                     
-                    cameraManager.startRecordingVideo( {(error)->() in
+                    cameraManager.startRecordingVideo( completion: {(error)->() in
                         
                         if let err = error {
                             print("Error ocurred: \(err)")
@@ -293,44 +291,44 @@ class ViewController: UIViewController {
         }
     }
     
-    @IBAction func outputModeButtonTapped(sender: UIButton) {
+    @IBAction func outputModeButtonTapped(_ sender: UIButton) {
         
-        cameraButton.selected = false
-        cameraButton.backgroundColor = UIColor.greenColor()
+        cameraButton.isSelected = false
+        cameraButton.backgroundColor = UIColor.green
         
         switch (cameraManager.cameraOutputMode) {
         case .VideoOnly:
             cameraManager.cameraOutputMode = CameraOutputMode.StillImage
-            sender.setTitle("Photo", forState: UIControlState.Normal)
+            sender.setTitle("Photo", for: UIControlState.normal)
         case .VideoWithMic:
             cameraManager.cameraOutputMode = CameraOutputMode.VideoOnly
-            sender.setTitle("Video", forState: UIControlState.Normal)
+            sender.setTitle("Video", for: UIControlState.normal)
         case .StillImage:
             cameraManager.cameraOutputMode = CameraOutputMode.VideoWithMic
-            sender.setTitle("Mic On", forState: UIControlState.Normal)
+            sender.setTitle("Mic On", for: UIControlState.normal)
         }
     }
     
-    @IBAction func changeCameraDevice(sender: UIButton) {
+    @IBAction func changeCameraDevice(_ sender: UIButton) {
         
         cameraManager.cameraDevice = cameraManager.cameraDevice == CameraDevice.Front ? CameraDevice.Back : CameraDevice.Front
         switch (cameraManager.cameraDevice) {
         case .Front:
-            sender.setTitle("Front", forState: UIControlState.Normal)
+            sender.setTitle("Front", for: UIControlState.normal)
         case .Back:
-            sender.setTitle("Back", forState: UIControlState.Normal)
+            sender.setTitle("Back", for: UIControlState.normal)
         }
     }
     
-    @IBAction func changeCameraQuality(sender: UIButton) {
+    @IBAction func changeCameraQuality(_ sender: UIButton) {
         
         switch (cameraManager.changeQualityMode()) {
         case .High:
-            sender.setTitle("High", forState: UIControlState.Normal)
+            sender.setTitle("High", for: UIControlState.normal)
         case .Low:
-            sender.setTitle("Low", forState: UIControlState.Normal)
+            sender.setTitle("Low", for: UIControlState.normal)
         case .Medium:
-            sender.setTitle("Medium", forState: UIControlState.Normal)
+            sender.setTitle("Medium", for: UIControlState.normal)
         }
     }
 }

@@ -25,25 +25,25 @@ import Photos
 import Accelerate
 
 public typealias LocalIdentifierType       = String
-public typealias LocalIdentifierBlock      = (localIdentifier: LocalIdentifierType?, error: NSError?) -> ()
-public typealias ImageWithIdentifierBlock  = (image:UIImage?) -> ()
-public typealias VideoWithIdentifierBlock  = (video:NSURL?) -> ()
-public typealias FrameBuffer               = (inBuffer: vImage_Buffer, outBuffer: vImage_Buffer, pixelBuffer: UnsafeMutablePointer<Void>)
+public typealias LocalIdentifierBlock      = (_ localIdentifier: LocalIdentifierType?, _ error: NSError?) -> ()
+public typealias ImageWithIdentifierBlock  = (_ image:UIImage?) -> ()
+public typealias VideoWithIdentifierBlock  = (_ video:NSURL?) -> ()
+public typealias FrameBuffer               = (inBuffer: vImage_Buffer, outBuffer: vImage_Buffer, pixelBuffer: UnsafeMutableRawPointer)
 
 @objc public class PGMCameraKitHelper: NSObject {
 
-    var manager = PHImageManager.defaultManager()
+    var manager = PHImageManager.default()
     
     
     // MARK: Save Image
     
-    public func saveImageAsAsset(image: UIImage, completion: LocalIdentifierBlock) {
+    public func saveImageAsAsset(image: UIImage, completion: @escaping LocalIdentifierBlock) {
         
         var imageIdentifier: LocalIdentifierType?
         
-        PHPhotoLibrary.sharedPhotoLibrary().performChanges({ () -> () in
+        PHPhotoLibrary.shared().performChanges({ () -> () in
             
-                let changeRequest   = PHAssetChangeRequest.creationRequestForAssetFromImage(image)
+            let changeRequest   = PHAssetChangeRequest.creationRequestForAsset(from: image)
                 
                 let placeHolder     = changeRequest.placeholderForCreatedAsset
                 
@@ -52,10 +52,10 @@ public typealias FrameBuffer               = (inBuffer: vImage_Buffer, outBuffer
             },
             completionHandler: { (success, error) -> () in
                 if success {
-                    completion(localIdentifier: imageIdentifier, error: nil)
+                    completion(imageIdentifier, nil)
                 }
                 else {
-                    completion(localIdentifier: nil, error: error)
+                    completion(nil, error as! NSError)
                 }
         })
     }
@@ -63,13 +63,13 @@ public typealias FrameBuffer               = (inBuffer: vImage_Buffer, outBuffer
     
     // MARK: Save Video
     
-    public func saveVideoAsAsset(videoURL: NSURL, completion: LocalIdentifierBlock) {
+    public func saveVideoAsAsset(videoURL: NSURL, completion: @escaping LocalIdentifierBlock) {
         
         var videoIdentifier: LocalIdentifierType?
         
-        PHPhotoLibrary.sharedPhotoLibrary().performChanges({ () -> () in
+        PHPhotoLibrary.shared().performChanges({ () -> () in
             
-            let changeRequest   = PHAssetChangeRequest.creationRequestForAssetFromVideoAtFileURL(videoURL)
+            let changeRequest   = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: videoURL as URL)
             
             let placeHolder     = changeRequest?.placeholderForCreatedAsset
             
@@ -78,10 +78,10 @@ public typealias FrameBuffer               = (inBuffer: vImage_Buffer, outBuffer
             },
             completionHandler: { (success, error) -> () in
                 if success {
-                    completion(localIdentifier: videoIdentifier, error: nil)
+                    completion(videoIdentifier, nil)
                 }
                 else {
-                    completion(localIdentifier: nil, error: error)
+                    completion(nil, error as NSError?)
                 }
         })
     }
@@ -89,56 +89,52 @@ public typealias FrameBuffer               = (inBuffer: vImage_Buffer, outBuffer
     
     // MARK: Retrieve Image by Id
     
-    public func retrieveImageWithIdentifer(localIdentifier:LocalIdentifierType, completion: ImageWithIdentifierBlock) {
+    public func retrieveImageWithIdentifer(localIdentifier:LocalIdentifierType, completion: @escaping ImageWithIdentifierBlock) {
         
         let fetchOptions = PHFetchOptions()
-        fetchOptions.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.Image.rawValue)
-        let fetchResults = PHAsset.fetchAssetsWithLocalIdentifiers([localIdentifier], options: fetchOptions)
+        fetchOptions.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+        let fetchResults = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: fetchOptions)
         
         if fetchResults.count > 0 {
             
-            if let imageAsset = fetchResults.objectAtIndex(0) as? PHAsset {
-                
+             let imageAsset = fetchResults.object(at: 0)
+           
                 let requestOptions = PHImageRequestOptions()
                 
-                requestOptions.deliveryMode = .HighQualityFormat
+                requestOptions.deliveryMode = .highQualityFormat
                 
-                manager.requestImageForAsset(imageAsset, targetSize: PHImageManagerMaximumSize,
-                                             contentMode: .AspectFill, options: requestOptions,
+            manager.requestImage(for: imageAsset, targetSize: PHImageManagerMaximumSize,
+                                 contentMode: .aspectFill, options: requestOptions,
                                              resultHandler: { (image, info) -> () in
                     
-                                                completion(image: image)
+                                                completion(image)
                 })
             }
-            else {
-                completion(image: nil)
-            }
-        }
         else {
-            completion(image: nil)
+            completion(nil)
         }
     }
     
     
     // MARK: Retrive video by id
     
-    public func retrieveVideoWithIdentifier(localIdentifier:LocalIdentifierType, completion: VideoWithIdentifierBlock) {
+    public func retrieveVideoWithIdentifier(localIdentifier:LocalIdentifierType, completion: @escaping VideoWithIdentifierBlock) {
         
         let fetchOptions = PHFetchOptions()
-        fetchOptions.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.Video.rawValue)
+        fetchOptions.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.video.rawValue)
         
-        let fetchResults = PHAsset.fetchAssetsWithLocalIdentifiers([localIdentifier], options: fetchOptions)
+        let fetchResults = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: fetchOptions)
         
         if fetchResults.count > 0 {
             
-            if let videoAsset = fetchResults.objectAtIndex(0) as? PHAsset {
+            if let videoAsset = fetchResults.object(at: 0) as? PHAsset {
                 
                 /* We want to be able to display a video even if it currently
                 resides only on the cloud and not on the device */
                 let options = PHVideoRequestOptions()
-                options.deliveryMode = .Automatic
-                options.networkAccessAllowed = true
-                options.version = .Current
+                options.deliveryMode = .automatic
+                options.isNetworkAccessAllowed = true
+                options.version = .current
                 options.progressHandler = {(progress: Double,
                     error: NSError?,
                     stop: UnsafeMutablePointer<ObjCBool>,
@@ -147,50 +143,50 @@ public typealias FrameBuffer               = (inBuffer: vImage_Buffer, outBuffer
                     /* You can write your code here that shows a progress bar to the
                     user and then using the progress parameter of this block object, you
                     can update your progress bar. */
-                }
+                    } as? PHAssetVideoProgressHandler
                 
                 /* Now get the video */
-                PHCachingImageManager().requestAVAssetForVideo(videoAsset,
+                PHCachingImageManager().requestAVAsset(forVideo: videoAsset,
                     options: options,
                     resultHandler: {(asset: AVAsset?,
                         audioMix: AVAudioMix?,
                         info: [NSObject : AnyObject]?) in
                         
                         if let asset = asset as? AVURLAsset{
-                            completion(video: asset.URL)
+                            completion(asset.url as NSURL)
                         } else {
                             print("This is not a URL asset. Cannot play")
                         }
                         
-                })
+                        } as! (AVAsset?, AVAudioMix?, [AnyHashable : Any]?) -> Void)
             }
             else {
-                completion(video: nil)
+                completion(nil)
             }
         }
         else {
-            completion(video: nil)
+            completion(nil)
         }
     }
     
     
     // MARK: Compress Video
     
-    public func compressVideo(inputURL: NSURL, outputURL: NSURL, outputFileType:String, handler:(session: AVAssetExportSession?)-> Void)
+    public func compressVideo(inputURL: NSURL, outputURL: NSURL, outputFileType:String, handler:@escaping (_ session: AVAssetExportSession?)-> Void)
     {
-        let urlAsset = AVURLAsset(URL: inputURL, options: nil)
+        let urlAsset = AVURLAsset(url: inputURL as URL, options: nil)
         
         let exportSession = AVAssetExportSession(asset: urlAsset, presetName: AVAssetExportPresetMediumQuality)
         
-        exportSession?.outputURL = outputURL
+        exportSession?.outputURL = outputURL as URL
         
         exportSession?.outputFileType = outputFileType
         
         exportSession?.shouldOptimizeForNetworkUse = true
         
-        exportSession?.exportAsynchronouslyWithCompletionHandler { () -> Void in
+        exportSession?.exportAsynchronously { () -> Void in
             
-            handler(session: exportSession)
+            handler(exportSession)
         }
     }
 }

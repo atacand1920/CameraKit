@@ -23,11 +23,11 @@ THE SOFTWARE.
 import Foundation
 
 public typealias TimerWillStart    = () -> ()
-public typealias TimerDidFire      = (time: String) -> ()
+public typealias TimerDidFire      = (_ time: String) -> ()
 public typealias TimerDidPause     = () -> ()
 public typealias TimerWillResume   = () -> ()
 public typealias TimerDidStop      = () -> ()
-public typealias TimerDidEnd       = (time: String) -> ()
+public typealias TimerDidEnd       = (_ time: String) -> ()
 
 
 public enum TimerState {
@@ -43,11 +43,11 @@ public enum TimerState {
     
     public var state:TimerState             = .TimerStateUnkown
     
-    private var timer: NSTimer!
-    private var interval: NSTimeInterval    = 0.05
-    private var timerEnd: NSTimeInterval
-    private var timeCount: NSTimeInterval   = 0.0
-    private var diff: NSTimeInterval        = 0.0
+    private var timer: Timer!
+    private var interval: TimeInterval    = 0.05
+    private var timerEnd: TimeInterval
+    private var timeCount: TimeInterval   = 0.0
+    private var diff: TimeInterval        = 0.0
     
     private var timerWillStart: TimerWillStart!
     private var timerDidFire: TimerDidFire!
@@ -59,7 +59,7 @@ public enum TimerState {
     
     // MARK: Init / Deinit
     
-    public init(timerEnd: NSTimeInterval, timerWillStart: TimerWillStart, timerDidFire: TimerDidFire, timerDidPause: TimerDidPause, timerWillResume: TimerWillResume, timerDidStop: TimerDidStop, timerDidEnd: TimerDidEnd)
+    public init(timerEnd: TimeInterval, timerWillStart: @escaping TimerWillStart, timerDidFire: @escaping TimerDidFire, timerDidPause:  @escaping TimerDidPause, timerWillResume: @escaping TimerWillResume, timerDidStop: @escaping TimerDidStop, timerDidEnd: @escaping TimerDidEnd)
     {
         self.timerEnd           = timerEnd
         
@@ -79,12 +79,12 @@ public enum TimerState {
     
     
     // MARK: Start - Pause - Resume - Stop
-    @objc public func start(tmr : NSTimer? = nil)
+    @objc public func start(tmr : Timer? = nil)
     {
         if timer == nil {
             
             timerWillStart()
-            timer = NSTimer.scheduledTimerWithTimeInterval(interval, target: self, selector: #selector(PGMTimer.fire), userInfo: nil, repeats: true)
+            timer = Timer.scheduledTimer(timeInterval: interval, target: self, selector: #selector(PGMTimer.fire), userInfo: nil, repeats: true)
         }
         else {
             
@@ -99,8 +99,8 @@ public enum TimerState {
         guard timer != nil else {
             fatalError("Timer not initialized")
         }
-        
-        diff = timer.fireDate.timeIntervalSinceDate(NSDate())
+       
+        diff =  timer.fireDate.timeIntervalSince(Date())
         timer.invalidate()
         timer = nil
         
@@ -118,8 +118,7 @@ public enum TimerState {
         state = .TimerStateRunning
         
         timerWillResume()
-        
-        NSTimer.scheduledTimerWithTimeInterval(diff, target: self, selector: #selector(PGMTimer.start(_:)), userInfo: nil, repeats: false)
+        Timer.scheduledTimer(timeInterval: diff, target: self, selector: #selector(PGMTimer.start(tmr:)), userInfo: nil, repeats: false)
         diff = 0.0
     }
     
@@ -162,19 +161,19 @@ public enum TimerState {
             
             state = .TimerStateEnded
             
-            timerDidEnd(time: timeString(timeCount))
+            timerDidEnd(timeString(time: timeCount))
             
             reset()
         }
         else {
-            timerDidFire(time: timeString(timeCount))
+            timerDidFire(timeString(time: timeCount))
         }
     }
     
     
     // MARK: Helpers
     
-    func timeString(time:NSTimeInterval) -> String {
+    func timeString(time:TimeInterval) -> String {
         
         let minutes         = Int(time) / 60
         let seconds         = time - Double(minutes) * 60
